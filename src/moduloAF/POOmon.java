@@ -198,7 +198,7 @@ public class POOmon implements POOmonBehavior {
 		try {
 			FileWriter fw = new FileWriter("EntregaDia17112021/"+this.name + "logPOOmon.txt");
 			BufferedWriter writer = new BufferedWriter(fw);
-			writer.write("Ataque Efetuado: " + typeattacktext + " " + damage + "(" + (damage + damageboost) + ") - "
+			writer.write("Ataque Efetuado: " + typeattacktext + " " + damage + " - " + arg1 + "(" + (damage + damageboost) + ") - "
 					+ arg1.toString() + "(-" + energyspent + ")");
 			writer.close();
 		} catch (IOException ieo) {
