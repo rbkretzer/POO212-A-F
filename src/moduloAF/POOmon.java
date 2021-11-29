@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Random;
 
+import javax.imageio.ImageIO;
+
 import moduloAGame.Env;
 import moduloAGame.Mediator;
 import moduloAGame.POOmonBehavior;
@@ -27,15 +29,11 @@ public class POOmon implements POOmonBehavior {
 
 	private LocalDateTime highestEnergyTime;
 
-	private boolean lostGame;
-
 	private int wins;
 
 	private Env environment;
 
-	private MediatorClass mediator;
-
-	private int game;
+	private Mediator mediator;
 	
 	public POOmon(String name, String history, Env env) {
 		setName(name);
@@ -43,14 +41,6 @@ public class POOmon implements POOmonBehavior {
 		setImage(image);
 		setEnvironment(env);
 		setEnergy(500);
-	}
-	
-	public void setGame(int game) {
-		this.game = game;
-	};
-
-	public void serLostGame(boolean lostGame) {
-		this.lostGame = lostGame;
 	}
 
 	public void setName(String name) {
@@ -87,10 +77,6 @@ public class POOmon implements POOmonBehavior {
 
 	public void addWin() {
 		this.wins += 1;
-	}
-	
-	public MediatorClass getMediato() {
-		return this.mediator;
 	}
 
 	@Override
@@ -148,44 +134,50 @@ public class POOmon implements POOmonBehavior {
 	
 	@Override
 	public void loser() {
-		
+        try {
+			FileWriter fw = new FileWriter("logs/"+ this.name +"/"+ this.name + "Log.txt");
+            BufferedWriter writer = new BufferedWriter(fw);
+            writer.write("Derrota");
+            writer.close();
+        } catch (IOException ieo) {
+            ieo.printStackTrace();
+        }
 	}
 	
 	@Override
 	public void winner() {
-		// TODO Auto-generated method stub
-		
-	}
-
-	public boolean getLostGame() {
-		return this.lostGame;
-	}
-
-	public int getGame() {
-		return this.game;
+		addWin();
+        try {
+			FileWriter fw = new FileWriter("logs/"+ this.name +"/"+ this.name + "Log.txt");
+            BufferedWriter writer = new BufferedWriter(fw);
+            writer.write("Vitória");
+            writer.close();
+        } catch (IOException ieo) {
+            ieo.printStackTrace();
+        }
 	}
 
 	@Override
 	public void attack(POOmonBehavior arg0, Env arg1) {
 		int damage = 0;
 		int damageboost = 0;
-		String typeattacktext = "";
+		String typeAttackText = "";
 		Random randomint = new Random();
 		int typeAttack = randomint.nextInt(3 - 1 + 1) + 1;
 		int energyspent = 0;
 		if (typeAttack == 3) {
 			energyspent = randomint.nextInt(200 - 100 + 1) + 100;
 			damage = Math.round(energyspent * 1.50f);
-			typeattacktext = "Cruel";
+			typeAttackText = "Cruel";
 		} else
 
 		if (typeAttack == 2) {
 			energyspent = randomint.nextInt(99 - 40 + 1) + 40;
 			damage = Math.round(energyspent);
-			typeattacktext = "Agressivo";
+			typeAttackText = "Agressivo";
 		} else {
 			damage = 30;
-			typeattacktext = "Básico";
+			typeAttackText = "Básico";
 		}
 		if (typeAttack == 3 || typeAttack == 2) {
 			this.energy -= damage;
@@ -196,31 +188,50 @@ public class POOmon implements POOmonBehavior {
 		arg0.takeDamage(damage + damageboost, arg1);
 
 		try {
-			FileWriter fw = new FileWriter("EntregaDia17112021/"+this.name + "logPOOmon.txt");
+			FileWriter fw = new FileWriter("logs/"+ this.name +"/"+ this.name + "Log.txt");
 			BufferedWriter writer = new BufferedWriter(fw);
-			writer.write("Ataque Efetuado: " + typeattacktext + " " + damage + " - " + arg1 + "(" + (damage + damageboost) + ") - "
+			writer.write("Ataque Efetuado: " + typeAttackText + " " + damage + " (" + (damage + damageboost) + ") - "
 					+ arg1.toString() + "(-" + energyspent + ")");
 			writer.close();
 		} catch (IOException ieo) {
 			ieo.printStackTrace();
 		}
-		changeImage();
+		if(!arg0.isAlive()) {
+			winner();
+			restoreEnergy(50);
+			restoreEnergy(500);
+		} else {			
+			restoreEnergy(50);
+		}
+		setImage();
 	}
 
-	private void changeImage() {
-		if (!isAlive()) {
-			
-		}
+	private void setImage() {
+		try {
+			Image image;
+            if (!isAlive()) {
+                image = ImageIO.read(getClass().getResource("resources/"+this.name+"Morto.png"));
+            } else if (getEnergy() > 350) {
+            	image = ImageIO.read(getClass().getResource("resources/"+this.name+"Saudavel.png"));
+            } else if (getEnergy() > 151) {
+                image = ImageIO.read(getClass().getResource("resources/"+this.name+"Cansado.png"));
+            } else {
+            	image = ImageIO.read(getClass().getResource("resources/"+this.name+"Exausto.png"));
+            }
+            this.image = image;
+        } catch (IOException io) {
+            io.printStackTrace();
+        }
 	}
 
 	@Override
 	public void restoreEnergy(int arg0) {
-		setEnergy(arg0);
+		setEnergy(this.energy + arg0);
 	}
 
 	@Override
 	public void setMediator(Mediator arg0) {
-		this.mediator = (MediatorClass) arg0;
+		this.mediator = arg0;
 	}
 
 	@Override
@@ -232,14 +243,17 @@ public class POOmon implements POOmonBehavior {
 		this.energy -= damage;
 
 		try {
-			FileWriter fw = new FileWriter(this.name + "Log.txt");
+			FileWriter fw = new FileWriter("logs/"+ this.name +"/"+ this.name + "Log.txt");
 			BufferedWriter writer = new BufferedWriter(fw);
 			writer.write("Ataque Recebido: " + arg0 + " - " + arg1.toString() + "(-" + damage + ")");
 			writer.close();
 		} catch (IOException ieo) {
 			ieo.printStackTrace();
 		}
-		changeImage();
+		setImage();
+		if(!this.isAlive()) {
+			loser();
+		}
 	}
 
 
