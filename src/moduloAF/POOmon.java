@@ -4,7 +4,9 @@ import java.awt.Image;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Random;
 
 import javax.imageio.ImageIO;
@@ -34,11 +36,16 @@ public class POOmon implements POOmonBehavior {
 	private Env environment;
 
 	private Mediator mediator;
-	
+	// utilizado somente para controle do log
+	private boolean takedDamage;
+	// utilizado somente para controle do log
+	private boolean attacked;
+	// utilizado somente para controle do log
+	private int shift = 0;
+
 	public POOmon(String name, String history, Env env) {
 		setName(name);
 		setHistory(history);
-		setImage(image);
 		setEnvironment(env);
 		setEnergy(500);
 	}
@@ -131,77 +138,77 @@ public class POOmon implements POOmonBehavior {
 	public Image getImage() {
 		return this.image;
 	}
-	
+
 	@Override
 	public void loser() {
-        try {
-			FileWriter fw = new FileWriter("logs/"+ this.name +"/"+ this.name + "Log.txt");
-            BufferedWriter writer = new BufferedWriter(fw);
-            writer.write("Derrota");
-            writer.close();
-        } catch (IOException ieo) {
-            ieo.printStackTrace();
-        }
-	}
-	
-	@Override
-	public void winner() {
-		addWin();
-        try {
-			FileWriter fw = new FileWriter("logs/"+ this.name +"/"+ this.name + "Log.txt");
-            BufferedWriter writer = new BufferedWriter(fw);
-            writer.write("Vitória");
-            writer.close();
-        } catch (IOException ieo) {
-            ieo.printStackTrace();
-        }
-	}
-
-	@Override
-	public void attack(POOmonBehavior arg0, Env arg1) {
-		int damage = 0;
-		int damageboost = 0;
-		String typeAttackText = "";
-		Random randomint = new Random();
-		int typeAttack = randomint.nextInt(3 - 1 + 1) + 1;
-		int energyspent = 0;
-		if (typeAttack == 3) {
-			energyspent = randomint.nextInt(200 - 100 + 1) + 100;
-			damage = Math.round(energyspent * 1.50f);
-			typeAttackText = "Cruel";
-		} else
-
-		if (typeAttack == 2) {
-			energyspent = randomint.nextInt(99 - 40 + 1) + 40;
-			damage = Math.round(energyspent);
-			typeAttackText = "Agressivo";
-		} else {
-			damage = 30;
-			typeAttackText = "Básico";
-		}
-		if (typeAttack == 3 || typeAttack == 2) {
-			this.energy -= damage;
-		}
-		if (arg1.equals(this.environment)) {
-			damageboost = Math.round(damage * 0.20f);
-		}
-		arg0.takeDamage(damage + damageboost, arg1);
-
 		try {
-			FileWriter fw = new FileWriter("logs/"+ this.name +"/"+ this.name + "Log.txt");
+			FileWriter fw = new FileWriter(mediator.getLogFilesPath().toFile());
 			BufferedWriter writer = new BufferedWriter(fw);
-			writer.write("Ataque Efetuado: " + typeAttackText + " " + damage + " (" + (damage + damageboost) + ") - "
-					+ arg1.toString() + "(-" + energyspent + ")");
+			writer.write("Derrota");
 			writer.close();
 		} catch (IOException ieo) {
 			ieo.printStackTrace();
 		}
-		if(!arg0.isAlive()) {
-			winner();
-			restoreEnergy(50);
-			restoreEnergy(500);
-		} else {			
-			restoreEnergy(50);
+	}
+
+	@Override
+	public void winner() {
+		addWin();
+		try {
+			FileWriter fw = new FileWriter(mediator.getLogFilesPath().toFile());
+			BufferedWriter writer = new BufferedWriter(fw);
+			writer.write("Vitória");
+			writer.close();
+		} catch (IOException ieo) {
+			ieo.printStackTrace();
+		}
+	}
+
+	@Override
+	public void attack(POOmonBehavior arg0, Env arg1) {
+		try {
+			FileWriter fw = new FileWriter(mediator.getLogFilesPath().toFile());
+			BufferedWriter writer = new BufferedWriter(fw);
+			if (!this.takedDamage && !this.attacked) {
+				this.shift = 0;
+				printOpponent(arg0, writer);
+			}
+			int damage = 0;
+			int damageboost = 0;
+			String typeAttackText = "";
+			Random randomInt = new Random();
+			int typeAttack = randomInt.nextInt(3 - 1 + 1) + 1;
+			int energySpent = 0;
+			if (typeAttack == 3) {
+				energySpent = randomInt.nextInt(200 - 100 + 1) + 100;
+				damage = Math.round(energySpent * 1.50f);
+				typeAttackText = "Cruel";
+			} else if (typeAttack == 2) {
+				energySpent = randomInt.nextInt(99 - 40 + 1) + 40;
+				damage = Math.round(energySpent);
+				typeAttackText = "Agressivo";
+			} else {
+				damage = 30;
+				typeAttackText = "Básico";
+			}
+			if (typeAttack == 3 || typeAttack == 2) {
+				this.energy -= damage;
+			}
+			if (arg1.equals(this.environment)) {
+				damageboost = Math.round(damage * 0.20f);
+			}
+			if (this.shift == 0) {
+				printVitalEnergy(writer);
+			}
+			arg0.takeDamage(damage + damageboost, arg1);
+			writer.write("Ataque Efetuado: " + typeAttackText + " " + damage + " (" + (damage + damageboost) + ") - "
+					+ arg1.toString() + "(-" + energySpent + ")");
+			writer.close();
+			if (this.shift == 0) {
+				restoreEnergy(50);
+			}
+		} catch (IOException ieo) {
+			ieo.printStackTrace();
 		}
 		setImage();
 	}
@@ -209,24 +216,36 @@ public class POOmon implements POOmonBehavior {
 	private void setImage() {
 		try {
 			Image image;
-            if (!isAlive()) {
-                image = ImageIO.read(getClass().getResource("resources/"+this.name+"Morto.png"));
-            } else if (getEnergy() > 350) {
-            	image = ImageIO.read(getClass().getResource("resources/"+this.name+"Saudavel.png"));
-            } else if (getEnergy() > 151) {
-                image = ImageIO.read(getClass().getResource("resources/"+this.name+"Cansado.png"));
-            } else {
-            	image = ImageIO.read(getClass().getResource("resources/"+this.name+"Exausto.png"));
-            }
-            this.image = image;
-        } catch (IOException io) {
-            io.printStackTrace();
-        }
+			if (!isAlive()) {
+				image = ImageIO.read(getClass().getResource(this.name + "/Morto.png"));
+			} else if (getEnergy() > 350) {
+				image = ImageIO.read(getClass().getResource(this.name + "/Saudavel.png"));
+			} else if (getEnergy() > 151) {
+				image = ImageIO.read(getClass().getResource(this.name + "/Cansado.png"));
+			} else {
+				image = ImageIO.read(getClass().getResource(this.name + "/Exausto.png"));
+			}
+			this.image = image;
+		} catch (IOException io) {
+			io.printStackTrace();
+		}
 	}
 
 	@Override
 	public void restoreEnergy(int arg0) {
+		try {
+			FileWriter fw = new FileWriter(mediator.getLogFilesPath().toFile());
+			BufferedWriter writer = new BufferedWriter(fw);
+			writer.write("Energia recebida: " + arg0);
+			writer.close();
+		} catch (IOException ieo) {
+			ieo.printStackTrace();
+		}
 		setEnergy(this.energy + arg0);
+		if (this.energy > this.highestEnergy) {
+			this.highestEnergy = energy;
+			this.highestEnergyTime = LocalDateTime.now();
+		}
 	}
 
 	@Override
@@ -236,25 +255,56 @@ public class POOmon implements POOmonBehavior {
 
 	@Override
 	public void takeDamage(int arg0, Env arg1) {
-		int damage = arg0;
-		if (arg1.equals(this.environment)) {
-			damage = Math.round(arg0 * 0.90f);
-		}
-		this.energy -= damage;
-
 		try {
-			FileWriter fw = new FileWriter("logs/"+ this.name +"/"+ this.name + "Log.txt");
+			FileWriter fw = new FileWriter(mediator.getLogFilesPath().toFile());
 			BufferedWriter writer = new BufferedWriter(fw);
+			if (!this.takedDamage && !this.attacked) {
+				this.shift = 1; 
+				/*Professor, não consegui imaginar como eu imprimiria o oponente no cenário onde
+					o POOmon começa recebendo o dano
+				*/
+			}
+			int damage = arg0;
+			if (arg1.equals(this.environment)) {
+				damage = Math.round(arg0 * 0.90f);
+			}
+			if (this.shift == 1) {
+				printVitalEnergy(writer);
+			}
+			this.energy -= damage;
+
 			writer.write("Ataque Recebido: " + arg0 + " - " + arg1.toString() + "(-" + damage + ")");
 			writer.close();
+			if (this.shift == 1) {
+				restoreEnergy(50);
+			}
 		} catch (IOException ieo) {
 			ieo.printStackTrace();
 		}
 		setImage();
-		if(!this.isAlive()) {
-			loser();
-		}
 	}
 
+	private void printVitalEnergy(BufferedWriter writer) throws IOException {
+		DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+		DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+		writer.write("Minha energia vital: " + this.energy + " - "
+				+ LocalDate.parse(LocalDate.now().toString(), dateFormatter) + " - "
+				+ LocalDateTime.parse(LocalDateTime.now().toString(), timeFormatter));
+	}
 
+	private void printOpponent(POOmonBehavior pooMon, BufferedWriter writer) throws IOException {
+		String env = "";
+		switch (pooMon.getEnvironment().ordinal()) {
+		case 0:
+			env = "Água";
+			break;
+		case 1:
+			env = "Ar";
+			break;
+		case 2:
+			env = "Terra";
+			break;
+		}
+		writer.write("Openente: " + pooMon.getName() + " - " + env);
+	}
 }
